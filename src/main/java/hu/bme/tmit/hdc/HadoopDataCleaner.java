@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Scanner;
+import java.util.Set;
 
 import lombok.Getter;
 
@@ -29,14 +30,14 @@ import com.google.common.collect.Maps;
 
 public class HadoopDataCleaner {
 	
+	private static final String SPARK_HOST = "local";
+	private static final String SPARK_HOME = "/home/cskassai/Dropbox/Egyetem/Onlab/spark/spark-0.9.0-incubating";
 	private static final Logger log = LoggerFactory.getLogger( HadoopDataCleaner.class );
 	
 	public static void main( String[] args ) {
 		
-		log.info( "HAHA" );
-		
-		JavaSparkContext sc = new JavaSparkContext( "local", "Simple App",
-			"/home/cskassai/Dropbox/Egyetem/Onlab/spark/spark-0.9.0-incubating", new String[] { "target/hdc-0.0.1-SNAPSHOT.jar" } );
+		JavaSparkContext sc = new JavaSparkContext( SPARK_HOST, "Simple App",
+			SPARK_HOME, new String[] { "target/hdc-0.0.1-SNAPSHOT.jar" } );
 		Scanner in = new Scanner( System.in );
 		System.out.println( "Inputfile:" );
 		String fileName = in.nextLine();
@@ -48,7 +49,7 @@ public class HadoopDataCleaner {
 		JavaRDD<String> data = sc.textFile( fileName ).cache();
 		int method = 0;
 		while (method < 1 || method > 2) {
-			System.out.println( "(1) Fingerprinting" );
+			System.out.println( "(1) Clustering" );
 			System.out.println( "(2) Transform" );
 			method = in.nextInt();
 		}
@@ -116,7 +117,7 @@ public class HadoopDataCleaner {
 						}
 						
 					} );
-				
+				int klaszterek = reduceByKey.collect().size();
 				JavaPairRDD<String, FingeringCluster> filter = reduceByKey
 					.filter( new Function<Tuple2<String, FingeringCluster>, Boolean>() {
 						
@@ -133,9 +134,21 @@ public class HadoopDataCleaner {
 				List<Tuple2<String, FingeringCluster>> collect = sortByKey.collect();
 				String outputFile = in.next();
 				values.saveAsTextFile( outputFile );
+				int cserelt = 0;
 				for (Tuple2<String, FingeringCluster> elem : collect) {
-					System.out.println( elem._2() );
+					
+					FingeringCluster fingeringCluster = elem._2();
+					Set<Entry<String, Integer>> entrySet = fingeringCluster.elementCountMap.entrySet();
+					for (Entry<String, Integer> entry : entrySet) {
+						if (!entry.getKey().equals( fingeringCluster.getDominantElement() )) {
+							cserelt = cserelt + entry.getValue();
+						}
+					}
+					System.out.println( fingeringCluster );
 				}
+				
+				System.out.println( "Klaszterek szama: " + klaszterek );
+				System.out.println( "Cserélt: " + cserelt );
 				
 				break;
 			
